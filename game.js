@@ -32,6 +32,11 @@ class HomeScene extends Phaser.Scene {
         super('HomeScene');
     }
 
+    preload() {
+        // Load background music (replace 'assets/audio/background.mp3' with your actual audio file)
+        this.load.audio('bgMusic', 'westernbackground.m4a');
+    }
+
     create() {
         // Background (solid color for now)
         this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
@@ -64,8 +69,17 @@ class HomeScene extends Phaser.Scene {
             color: '#000'
         }).setOrigin(0.5);
 
+        // Add and configure the background music
+        this.bgMusic = this.sound.add('bgMusic', { loop: true });
+
         // Button interactions
-        startButton.on('pointerdown', () => this.scene.start('GameScene'));
+        startButton.on('pointerdown', () => {
+            if (!this.bgMusic.isPlaying) {
+                this.bgMusic.play();
+            }
+            this.scene.start('GameScene');
+        });
+
         shopButton.on('pointerdown', () => this.scene.start('ShopScene'));
 
         startButton.on('pointerover', () => startButton.setStyle({ color: '#ff0' }));
@@ -120,7 +134,8 @@ class ShopScene extends Phaser.Scene {
                         this.add.text(400, 500, 'Not enough coins!', {
                             fontSize: '20px',
                             color: '#f00'
-                        }).setOrigin(0.5).setDepth(1).setTimeout(() => this.destroy(), 2000);
+                        }).setOrigin(0.5).setDepth(1);
+                        this.time.delayedCall(2000, () => this.children.list.find(child => child.text === 'Not enough coins!')?.destroy());
                     }
                 });
 
@@ -156,12 +171,12 @@ class GameScene extends Phaser.Scene {
 
     preload() {
         // Placeholder assets (replace with your pixel-art assets)
-        this.load.image('cowboy', 'westerncowboy.png');
-        this.load.image('hotel', 'westernhotel.png');
-        this.load.image('dynamite', 'westerndynamite.png');
-        this.load.image('coin', 'westerncoin.png');
-        this.load.image('enemy', 'westernboss.png');
-        this.load.image('explosion', 'westernexplosion.png');
+        this.load.image('cowboy', 'https://via.placeholder.com/32x32.png?text=Cowboy');
+        this.load.image('hotel', 'https://via.placeholder.com/64x64.png?text=Hotel');
+        this.load.image('dynamite', 'https://via.placeholder.com/16x16.png?text=Dynamite');
+        this.load.image('coin', 'https://via.placeholder.com/16x16.png?text=Coin');
+        this.load.image('enemy', 'https://via.placeholder.com/32x32.png?text=Enemy');
+        this.load.image('explosion', 'https://via.placeholder.com/64x64.png?text=Explosion');
     }
 
     create() {
