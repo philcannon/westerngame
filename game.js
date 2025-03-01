@@ -6,7 +6,8 @@ const gameState = {
         bigDynamite: false,
         speedBoots: false
     },
-    bgMusic: null  // To store the background music globally
+    bgMusic: null,  // Game background music
+    homeMusic: null // Home screen music
 };
 
 // Define scene classes first to ensure they are available before use
@@ -16,7 +17,9 @@ class HomeScene extends Phaser.Scene {
     }
 
     preload() {
-        // Load background music (update path to your actual audio file)
+        // Load home screen music (replace with your actual audio file)
+        this.load.audio('homeMusic', 'westernhomescreen.m4a');
+        // Load game background music (already used in GameScene)
         this.load.audio('bgMusic', 'westernbackground.m4a');
     }
 
@@ -52,16 +55,27 @@ class HomeScene extends Phaser.Scene {
             color: '#000'
         }).setOrigin(0.5);
 
-        // Background music setup
-        gameState.bgMusic = this.sound.add('bgMusic', { loop: true });
-        gameState.bgMusic.play();  // Start playing the music
+        // Home screen music setup (looping, distinct from game music)
+        gameState.homeMusic = this.sound.add('homeMusic', { loop: true });
+        gameState.homeMusic.play();
 
-        // Button interactions
+        // Stop home music when starting the game or shop
         startButton.on('pointerdown', () => {
+            if (gameState.homeMusic && gameState.homeMusic.isPlaying) {
+                gameState.homeMusic.stop();
+            }
+            // Start game background music when transitioning to GameScene
+            gameState.bgMusic = this.sound.add('bgMusic', { loop: true });
+            gameState.bgMusic.play();
             this.scene.start('GameScene');
         });
 
-        shopButton.on('pointerdown', () => this.scene.start('ShopScene'));
+        shopButton.on('pointerdown', () => {
+            if (gameState.homeMusic && gameState.homeMusic.isPlaying) {
+                gameState.homeMusic.stop();
+            }
+            this.scene.start('ShopScene');
+        });
 
         startButton.on('pointerover', () => startButton.setStyle({ color: '#ff0' }));
         startButton.on('pointerout', () => startButton.setStyle({ color: '#000' }));
@@ -111,7 +125,6 @@ class ShopScene extends Phaser.Scene {
                         localStorage.setItem('coins', gameState.coins);
                         localStorage.setItem('upgrades', JSON.stringify(gameState.upgrades));
                     } else {
-                        // Display "Not enough coins!" and destroy it after 2 seconds
                         const notEnoughText = this.add.text(400, 500, 'Not enough coins!', {
                             fontSize: '20px',
                             color: '#f00'
@@ -132,7 +145,13 @@ class ShopScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive();
 
-        backButton.on('pointerdown', () => this.scene.start('HomeScene'));
+        backButton.on('pointerdown', () => {
+            this.scene.start('HomeScene');
+            // Resume home music when returning
+            if (gameState.homeMusic) {
+                gameState.homeMusic.play();
+            }
+        });
         backButton.on('pointerover', () => backButton.setStyle({ color: '#ff0' }));
         backButton.on('pointerout', () => backButton.setStyle({ color: '#000' }));
     }
@@ -153,8 +172,8 @@ class GameScene extends Phaser.Scene {
         this.load.image('cowboy', 'westerncowboy.png');
         this.load.image('hotel', 'westernhotel.png');
         this.load.image('dynamite', 'westerndynamite.png');
-        this.load.image('coin', 'westserncoin.png');
-        this.load.image('enemy', 'westernboss1.png');
+        this.load.image('coin', 'westserncoin.png');  // Ensure this is a proper image, not a block
+        this.load.image('enemy', 'westernboss.png');
         this.load.image('explosion', 'westernexplosion.png');
     }
 
@@ -176,7 +195,7 @@ class GameScene extends Phaser.Scene {
         this.coins = this.physics.add.group();
         this.enemies = this.physics.add.group();
 
-        // Initial building spawn
+        // Initial building spawn (random across map)
         this.spawnBuilding();
 
         // HUD
@@ -189,9 +208,9 @@ class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-        // Spawning timers
+        // Spawning timers (reduce boss spawn frequency, keep buildings frequent)
         this.time.addEvent({ delay: 5000, callback: this.spawnBuilding, callbackScope: this, loop: true });
-        this.time.addEvent({ delay: 7000, callback: this.spawnEnemy, callbackScope: this, loop: true });
+        this.time.addEvent({ delay: 15000, callback: this.spawnEnemy, callbackScope: this, loop: true });  // Slower boss spawn
 
         // Collisions
         this.physics.add.collider(this.buildings, this.ground);
@@ -199,128 +218,171 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.dynamites, this.buildings, this.explodeDynamite, null, this);
         this.physics.add.overlap(this.cowboy, this.coins, this.collectCoin, null, this);
         this.physics.add.overlap(this.cowboy, this.enemies, this.takeDamage, null, this);
+
+        // Error handling for assets
+        this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key}`));
     }
 
     update() {
-        // Cowboy movement
-        const speed = gameState.upgrades.speedBoots ? 200 : 160;
-        if (this.cursors.left.isDown) {
-            this.cowboy.setVelocityX(-speed);
-            this.cowboy.flipX = true;
-        } else if (this.cursors.right.isDown) {
-            this.cowboy.setVelocityX(speed);
-            this.cowboy.flipX = false;
-        } else {
-            this.cowboy.setVelocityX(0);
-        }
+        try {
+            // Cowboy movement
+            const speed = gameState.upgrades.speedBoots ? 200 : 160;
+            if (this.cursors.left.isDown) {
+                this.cowboy.setVelocityX(-speed);
+                this.cowboy.flipX = true;
+            } else if (this.cursors.right.isDown) {
+                this.cowboy.setVelocityX(speed);
+                this.cowboy.flipX = false;
+            } else {
+                this.cowboy.setVelocityX(0);
+            }
 
-        if (this.cursors.up.isDown && this.cowboy.body.touching.down) {
-            this.cowboy.setVelocityY(-300);
-        }
+            if (this.cursors.up.isDown && this.cowboy.body.touching.down) {
+                this.cowboy.setVelocityY(-300);
+            }
 
-        // Dynamite throwing (unlimited, no stock decrease)
-        if (Phaser.Input.Keyboard.JustDown(this.spacebar)) {
-            this.isCharging = true;
-            this.throwCharge = 0;
-        }
+            // Dynamite throwing (unlimited, no stock decrease)
+            if (Phaser.Input.Keyboard.JustDown(this.spacebar)) {
+                this.isCharging = true;
+                this.throwCharge = 0;
+            }
 
-        if (this.isCharging) {
-            this.throwCharge += 0.05;
-            if (this.throwCharge > 2) this.throwCharge = 2;
-        }
+            if (this.isCharging) {
+                this.throwCharge += 0.05;
+                if (this.throwCharge > 2) this.throwCharge = 2;
+            }
 
-        if (Phaser.Input.Keyboard.JustUp(this.spacebar) && this.isCharging) {
-            this.isCharging = false;
-            this.throwDynamite();
-            // No dynamite stock decrease
-        }
+            if (Phaser.Input.Keyboard.JustUp(this.spacebar) && this.isCharging) {
+                this.isCharging = false;
+                this.throwDynamite();
+                // No dynamite stock decrease
+            }
 
-        // Enemy movement
-        this.enemies.getChildren().forEach(enemy => {
-            const direction = this.cowboy.x > enemy.x ? 1 : -1;
-            enemy.setVelocityX(direction * 100);
-        });
+            // Enemy movement
+            this.enemies.getChildren().forEach(enemy => {
+                const direction = this.cowboy.x > enemy.x ? 1 : -1;
+                enemy.setVelocityX(direction * 100);
+            });
+
+        } catch (error) {
+            console.error('Game update error:', error);
+        }
     }
 
     throwDynamite() {
-        const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'dynamite');
-        const throwStrength = 200 + this.throwCharge * 200;
-        dynamite.setVelocity(this.cowboy.flipX ? -throwStrength : throwStrength, -300);
-        this.physics.add.collider(dynamite, this.ground, () => dynamite.destroy());
+        try {
+            const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'dynamite');
+            const throwStrength = 200 + this.throwCharge * 200;
+            dynamite.setVelocity(this.cowboy.flipX ? -throwStrength : throwStrength, -300);
+            this.physics.add.collider(dynamite, this.ground, () => dynamite.destroy());
+        } catch (error) {
+            console.error('Dynamite throw error:', error);
+        }
     }
 
     explodeDynamite(dynamite, building) {
-        dynamite.destroy();
-        const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(gameState.upgrades.bigDynamite ? 1.5 : 1);
-        this.time.delayedCall(300, () => explosion.destroy());
+        try {
+            dynamite.destroy();
+            const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(gameState.upgrades.bigDynamite ? 1.5 : 1);
+            this.time.delayedCall(300, () => explosion.destroy());
 
-        building.destroy();
-        this.score += 10;
-        this.scoreText.setText(`Score: ${this.score}`);
+            building.destroy();
+            this.score += 10;
+            this.scoreText.setText(`Score: ${this.score}`);
 
-        // Spawn coins
-        for (let i = 0; i < 3; i++) {
-            const coin = this.coins.create(building.x + Phaser.Math.Between(-20, 20), building.y - 20, 'coin');
-            coin.setVelocity(Phaser.Math.Between(-100, 100), -200);
-            this.physics.add.collider(coin, this.ground);
+            // Spawn coins
+            for (let i = 0; i < 3; i++) {
+                const coin = this.coins.create(building.x + Phaser.Math.Between(-20, 20), building.y - 20, 'coin');
+                coin.setScale(0.5);  // Adjust coin size to ensure it’s not a block (small sprite)
+                coin.setVelocity(Phaser.Math.Between(-100, 100), -200);
+                this.physics.add.collider(coin, this.ground);
+            }
+        } catch (error) {
+            console.error('Explosion error:', error);
         }
     }
 
     collectCoin(cowboy, coin) {
-        coin.destroy();
-        this.coinsCollected++;
-        this.coinsText.setText(`Coins: ${this.coinsCollected}`);
+        try {
+            coin.destroy();
+            this.coinsCollected++;
+            this.coinsText.setText(`Coins: ${this.coinsCollected}`);
+        } catch (error) {
+            console.error('Coin collection error:', error);
+        }
     }
 
     takeDamage(cowboy, enemy) {
-        enemy.destroy();
-        this.health--;
-        this.healthText.setText(`Health: ${'♥'.repeat(this.health)}`);
-        if (this.health <= 0) this.gameOver();
+        try {
+            enemy.destroy();
+            this.health--;
+            this.healthText.setText(`Health: ${'♥'.repeat(this.health)}`);
+            if (this.health <= 0) this.gameOver();
+        } catch (error) {
+            console.error('Damage error:', error);
+        }
     }
 
     spawnBuilding() {
-        const x = Phaser.Math.Between(300, 500);  // Spawn closer to the center (300-500 on an 800px screen)
-        const building = this.buildings.create(x, 500, 'hotel').setOrigin(0.5, 1);
-        building.setImmovable(true);
+        try {
+            const x = Phaser.Math.Between(0, 800);  // Randomly place hotels across the map (0-800)
+            const building = this.buildings.create(x, 500, 'hotel').setOrigin(0.5, 1);  // Static placement on ground
+            building.setImmovable(true);
+        } catch (error) {
+            console.error('Building spawn error:', error);
+        }
     }
 
     spawnEnemy() {
-        const side = Phaser.Math.Between(0, 1) ? 0 : 800;
-        const enemy = this.enemies.create(side, 500, 'enemy').setOrigin(0.5, 1);
-        enemy.setScale(2);  // Make the boss larger (2x scale)
+        try {
+            const side = Phaser.Math.Between(0, 1) ? 0 : 800;
+            const enemy = this.enemies.create(side, 500, 'enemy').setOrigin(0.5, 1);
+            enemy.setScale(2);  // Keep boss larger
+        } catch (error) {
+            console.error('Enemy spawn error:', error);
+        }
     }
 
     gameOver() {
-        // Pause background music
-        if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
-            gameState.bgMusic.pause();
+        try {
+            // Pause background music instead of stopping, preserving position
+            if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
+                gameState.bgMusic.pause();
+            }
+
+            gameState.coins += this.coinsCollected;
+            if (this.score > gameState.highScore) gameState.highScore = this.score;
+            localStorage.setItem('coins', gameState.coins);
+            localStorage.setItem('highScore', gameState.highScore);
+
+            this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
+            this.add.text(400, 250, 'Game Over', { fontSize: '48px', color: '#fff' }).setOrigin(0.5);
+            this.add.text(400, 350, `Score: ${this.score}\nCoins Earned: ${this.coinsCollected}`, {
+                fontSize: '32px',
+                color: '#fff'
+            }).setOrigin(0.5);
+
+            const restartButton = this.add.text(400, 450, 'Back to Home', {
+                fontSize: '32px',
+                color: '#000',
+                backgroundColor: '#fff',
+                padding: { x: 10, y: 5 }
+            }).setOrigin(0.5).setInteractive();
+
+            restartButton.on('pointerdown', () => {
+                this.scene.start('HomeScene');
+                // Resume game music from paused position when returning to home
+                if (gameState.bgMusic) {
+                    gameState.bgMusic.resume();
+                }
+            });
+            restartButton.on('pointerover', () => restartButton.setStyle({ color: '#ff0' }));
+            restartButton.on('pointerout', () => restartButton.setStyle({ color: '#000' }));
+
+            this.physics.pause();
+        } catch (error) {
+            console.error('Game over error:', error);
         }
-
-        gameState.coins += this.coinsCollected;
-        if (this.score > gameState.highScore) gameState.highScore = this.score;
-        localStorage.setItem('coins', gameState.coins);
-        localStorage.setItem('highScore', gameState.highScore);
-
-        this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
-        this.add.text(400, 250, 'Game Over', { fontSize: '48px', color: '#fff' }).setOrigin(0.5);
-        this.add.text(400, 350, `Score: ${this.score}\nCoins Earned: ${this.coinsCollected}`, {
-            fontSize: '32px',
-            color: '#fff'
-        }).setOrigin(0.5);
-
-        const restartButton = this.add.text(400, 450, 'Back to Home', {
-            fontSize: '32px',
-            color: '#000',
-            backgroundColor: '#fff',
-            padding: { x: 10, y: 5 }
-        }).setOrigin(0.5).setInteractive();
-
-        restartButton.on('pointerdown', () => this.scene.start('HomeScene'));
-        restartButton.on('pointerover', () => restartButton.setStyle({ color: '#ff0' }));
-        restartButton.on('pointerout', () => restartButton.setStyle({ color: '#000' }));
-
-        this.physics.pause();
     }
 }
 
