@@ -154,7 +154,7 @@ class GameScene extends Phaser.Scene {
         this.load.image('hotel', 'westernhotel.png');
         this.load.image('dynamite', 'westerndynamite.png');
         this.load.image('coin', 'westserncoin.png');
-        this.load.image('enemy', 'westernboss.png');
+        this.load.image('enemy', 'westernboss1.png');
         this.load.image('explosion', 'westernexplosion.png');
     }
 
