@@ -156,12 +156,12 @@ class GameScene extends Phaser.Scene {
 
     preload() {
         // Placeholder assets (replace with your pixel-art assets)
-        this.load.image('cowboy', 'https://via.placeholder.com/32x32.png?text=Cowboy');
-        this.load.image('hotel', 'https://via.placeholder.com/64x64.png?text=Hotel');
-        this.load.image('dynamite', 'https://via.placeholder.com/16x16.png?text=Dynamite');
-        this.load.image('coin', 'https://via.placeholder.com/16x16.png?text=Coin');
-        this.load.image('enemy', 'https://via.placeholder.com/32x32.png?text=Enemy');
-        this.load.image('explosion', 'https://via.placeholder.com/64x64.png?text=Explosion');
+        this.load.image('cowboy', 'westerncowboy.png');
+        this.load.image('hotel', 'westernhotel.png');
+        this.load.image('dynamite', 'westerndynamite.png');
+        this.load.image('coin', 'westerncoin.png');
+        this.load.image('enemy', 'westernboss.png');
+        this.load.image('explosion', 'westernexplosion.png');
     }
 
     create() {
