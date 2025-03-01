@@ -1,44 +1,16 @@
-// Global game state
-const gameState = {
-    coins: parseInt(localStorage.getItem('coins')) || 0,
-    highScore: parseInt(localStorage.getItem('highScore')) || 0,
-    upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
-        bigDynamite: false,
-        speedBoots: false
-    }
-};
-
-// Phaser game configuration
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    parent: 'game-container',
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 500 },
-            debug: false
-        }
-    },
-    scene: [HomeScene, ShopScene, GameScene]
-};
-
-const game = new Phaser.Game(config);
-
-// Home Scene
+// Define scene classes first to ensure they are available before use
 class HomeScene extends Phaser.Scene {
     constructor() {
         super('HomeScene');
     }
 
     preload() {
-        // Load background music (replace 'assets/audio/background.mp3' with your actual audio file)
+        // Load background music (update path to your actual audio file)
         this.load.audio('bgMusic', 'westernbackground.m4a');
     }
 
     create() {
-        // Background (solid color for now)
+        // Background (solid color as placeholder)
         this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
 
         // Title
@@ -63,13 +35,13 @@ class HomeScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setOrigin(0.5).setInteractive();
 
-        // High score and coins
+        // High score and coins display
         this.add.text(400, 500, `High Score: ${gameState.highScore} | Coins: ${gameState.coins}`, {
             fontSize: '24px',
             color: '#000'
         }).setOrigin(0.5);
 
-        // Add and configure the background music
+        // Background music setup
         this.bgMusic = this.sound.add('bgMusic', { loop: true });
 
         // Button interactions
@@ -90,7 +62,6 @@ class HomeScene extends Phaser.Scene {
     }
 }
 
-// Shop Scene
 class ShopScene extends Phaser.Scene {
     constructor() {
         super('ShopScene');
@@ -110,7 +81,7 @@ class ShopScene extends Phaser.Scene {
 
         items.forEach((item, index) => {
             const y = 200 + index * 100;
-            const text = this.add.text(300, y, `${item.name} - ${item.cost} Coins`, {
+            this.add.text(300, y, `${item.name} - ${item.cost} Coins`, {
                 fontSize: '24px',
                 color: '#000'
             }).setOrigin(0.5);
@@ -131,11 +102,12 @@ class ShopScene extends Phaser.Scene {
                         localStorage.setItem('coins', gameState.coins);
                         localStorage.setItem('upgrades', JSON.stringify(gameState.upgrades));
                     } else {
-                        this.add.text(400, 500, 'Not enough coins!', {
+                        // Display "Not enough coins!" and destroy it after 2 seconds
+                        const notEnoughText = this.add.text(400, 500, 'Not enough coins!', {
                             fontSize: '20px',
                             color: '#f00'
                         }).setOrigin(0.5).setDepth(1);
-                        this.time.delayedCall(2000, () => this.children.list.find(child => child.text === 'Not enough coins!')?.destroy());
+                        this.time.delayedCall(2000, () => notEnoughText.destroy());
                     }
                 });
 
@@ -157,7 +129,6 @@ class ShopScene extends Phaser.Scene {
     }
 }
 
-// Game Scene
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
@@ -170,13 +141,13 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Placeholder assets (replace with your pixel-art assets)
-        this.load.image('cowboy', 'https://via.placeholder.com/32x32.png?text=Cowboy');
-        this.load.image('hotel', 'https://via.placeholder.com/64x64.png?text=Hotel');
-        this.load.image('dynamite', 'https://via.placeholder.com/16x16.png?text=Dynamite');
-        this.load.image('coin', 'https://via.placeholder.com/16x16.png?text=Coin');
-        this.load.image('enemy', 'https://via.placeholder.com/32x32.png?text=Enemy');
-        this.load.image('explosion', 'https://via.placeholder.com/64x64.png?text=Explosion');
+        // Placeholder assets (replace with your actual pixel-art assets)
+        this.load.image('cowboy', 'westerncowboy.png');
+        this.load.image('hotel', 'westernhotel.png');
+        this.load.image('dynamite', 'westerndynamite.png');
+        this.load.image('coin', 'westserncoin.png');
+        this.load.image('enemy', 'westernboss.png');
+        this.load.image('explosion', 'westernexplosion.png');
     }
 
     create() {
@@ -338,3 +309,32 @@ class GameScene extends Phaser.Scene {
         this.physics.pause();
     }
 }
+
+// Global game state
+const gameState = {
+    coins: parseInt(localStorage.getItem('coins')) || 0,
+    highScore: parseInt(localStorage.getItem('highScore')) || 0,
+    upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
+        bigDynamite: false,
+        speedBoots: false
+    }
+};
+
+// Game configuration
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    parent: 'game-container',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 500 },
+            debug: false
+        }
+    },
+    scene: [HomeScene, ShopScene, GameScene]
+};
+
+// Initialize the game
+const game = new Phaser.Game(config);
