@@ -10,21 +10,7 @@ const gameState = {
   bgMusic: null
 };
 
-// Game configuration
-const config = {
-  type: Phaser.AUTO,
-  width: 800, // Visible window size, can scroll larger world
-  height: 600,
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { y: 0 } }
-  },
-  scene: [HomeScene, ShopScene, GameScene]
-};
-
-const game = new Phaser.Game(config);
-
-// HomeScene: The main menu
+// Define scene classes first to ensure they are available before use
 class HomeScene extends Phaser.Scene {
   constructor() {
     super('HomeScene');
@@ -480,15 +466,3 @@ class GameScene extends Phaser.Scene {
     }
   }
 }
-
-// Global game state (moved after scenes to avoid initialization issues)
-const gameState = {
-  coins: parseInt(localStorage.getItem('coins')) || 0,
-  highScore: parseInt(localStorage.getItem('highScore')) || 0,
-  upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
-    bigDynamite: false,
-    speedBoots: false
-  },
-  homeMusic: null,
-  bgMusic: null
-};
