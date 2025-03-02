@@ -6,13 +6,17 @@ class HomeScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load all audio assets here for consistency
+    // Load all audio and image assets
     this.load.audio('homeMusic', 'westernhomescreen.m4a');
     this.load.audio('bgMusic', 'westernbackground.m4a');
-    // Load images based on attachment descriptions
-    this.load.image('cowboy', 'westerncowboy.png'); // Cowboy sprite
-    this.load.image('hotel', 'westernhotel.png');   // Hotel sprite
-    this.load.image('coin', 'westerncoin.png');
+    this.load.audio('dynamiteShoot', 'dynamiteshoot.mp3'); // Placeholder for future sound
+    this.load.audio('explosion', 'explosion.mp3');         // Placeholder for future sound
+    this.load.image('cowboy', 'westerncowboy.png');              // Cowboy sprite (player)
+    this.load.image('hotel', 'westernhotel.png');                // Hotel sprite (static building)
+    this.load.image('coin', 'westerncoin.png');           // Coin sprite
+    this.load.image('dynamite', 'westerndynamite.png');   // Dynamite sprite
+    this.load.image('enemy', 'westernboss.png');          // Boss sprite
+    this.load.image('explosion', 'westernexplosion.png'); // Explosion sprite
   }
 
   create() {
@@ -27,26 +31,36 @@ class HomeScene extends Phaser.Scene {
     }
     gameState.homeMusic.play();
 
-    // Add start button
+    // Background (solid color as placeholder)
+    this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+
+    // Title and buttons
+    this.add.text(400, 200, 'Cowboy Dynamite', {
+      fontSize: '48px',
+      color: '#000',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5);
+
     const startButton = this.add.text(400, 300, 'Start Game', {
       fontSize: '32px',
-      color: '#fff'
+      color: '#000',
+      backgroundColor: '#fff',
+      padding: { x: 10, y: 5 }
     }).setOrigin(0.5).setInteractive();
 
     startButton.on('pointerdown', () => {
       gameState.homeMusic.stop();
       this.scene.start('GameScene');
     });
+
+    // Debug: Log to ensure scene loads
+    console.log('HomeScene loaded successfully');
   }
 }
 
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
-  }
-
-  preload() {
-    // Assets already loaded in HomeScene preload
   }
 
   create() {
@@ -67,7 +81,10 @@ class GameScene extends Phaser.Scene {
     this.paused = false;
     this.health = 3;
 
-    // Player (cowboy sprite from image 1)
+    // Background (solid color as placeholder)
+    this.add.rectangle(400, 300, 800, 600, 0xF4A261);
+
+    // Player (cowboy sprite)
     this.cowboy = this.physics.add.sprite(400, 500, 'cowboy').setScale(1);
     this.cowboy.setCollideWorldBounds(true);
 
@@ -77,36 +94,43 @@ class GameScene extends Phaser.Scene {
     this.dynamites = this.physics.add.group();
     this.coins = this.physics.add.group();
 
-    // Spawn static hotels (from image 0)
+    // Spawn static hotels around the map
     for (let i = 0; i < 5; i++) {
       const x = Phaser.Math.Between(50, 750);
       const hotel = this.buildings.create(x, 500, 'hotel').setOrigin(0.5, 1);
       hotel.setImmovable(true);
     }
 
-    // Enemy spawn timer (boss enemies)
+    // Enemy spawn timer (boss enemies, every 20 seconds)
     this.time.addEvent({
-      delay: 20000, // 20 seconds
+      delay: 20000,
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true
     });
 
-    // Input for movement and dynamite
+    // Input for movement, dynamite, and pause
     this.cursors = this.input.keyboard.createCursorKeys();
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.throwCharge = 0;
-
-    // Pause key
     this.input.keyboard.on('keydown-ESC', this.togglePause, this);
 
-    // Collision setups
+    // HUD
+    this.scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '20px', color: '#000' });
+    this.coinsText = this.add.text(10, 40, 'Coins: 0', { fontSize: '20px', color: '#000' });
+    this.healthText = this.add.text(10, 70, 'Health: ♥♥♥', { fontSize: '20px', color: '#000' });
+
+    // Collisions
     this.physics.add.overlap(this.cowboy, this.enemies, this.takeDamage, null, this);
     this.physics.add.overlap(this.dynamites, this.enemies, this.killEnemy, null, this);
     this.physics.add.overlap(this.dynamites, this.buildings, this.explodeDynamite, null, this);
+    this.physics.add.overlap(this.cowboy, this.coins, this.collectCoin, null, this);
 
     // Error handling for assets
     this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key}`));
+
+    // Debug: Log to ensure scene loads
+    console.log('GameScene loaded successfully');
   }
 
   update() {
@@ -127,6 +151,7 @@ class GameScene extends Phaser.Scene {
         this.throwCharge = Math.min(this.throwCharge + 0.02, 1);
       } else if (Phaser.Input.Keyboard.JustUp(this.spaceKey)) {
         this.throwDynamite();
+        this.sound.play('dynamiteShoot'); // Placeholder sound for dynamite shooting
         this.throwCharge = 0;
       }
     } catch (error) {
@@ -136,7 +161,7 @@ class GameScene extends Phaser.Scene {
 
   spawnEnemy() {
     try {
-      const enemy = this.enemies.create(400, 50, 'cowboy').setScale(2); // Using cowboy sprite for boss, scaled larger
+      const enemy = this.enemies.create(400, 50, 'enemy').setScale(2); // Boss sprite
       enemy.setVelocityY(100); // Moves downward
     } catch (error) {
       console.error('Enemy spawn error:', error);
@@ -147,8 +172,9 @@ class GameScene extends Phaser.Scene {
     try {
       const baseStrength = this.bonusActive ? 300 : 200;
       const throwStrength = baseStrength + this.throwCharge * (this.bonusActive ? 300 : 200);
-      const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'coin'); // Placeholder sprite
+      const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'dynamite');
       dynamite.setVelocityY(-throwStrength);
+      dynamite.setScale(0.5); // Scale dynamite for visibility
     } catch (error) {
       console.error('Dynamite throw error:', error);
     }
@@ -195,11 +221,24 @@ class GameScene extends Phaser.Scene {
   explodeDynamite(dynamite, building) {
     try {
       dynamite.destroy();
+      const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(1);
+      this.sound.play('explosion'); // Placeholder sound for explosion
+      this.time.delayedCall(300, () => explosion.destroy());
+
       building.destroy();
       const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
       coin.setVelocityY(-100);
     } catch (error) {
       console.error('Explosion error:', error);
+    }
+  }
+
+  collectCoin(cowboy, coin) {
+    try {
+      coin.destroy();
+      // Add coin collection logic here if needed
+    } catch (error) {
+      console.error('Coin collection error:', error);
     }
   }
 
