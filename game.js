@@ -33,14 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
         { type: 'image', key: 'explosion', path: 'westernexplosion.png' }
       ];
 
-      assets.forEach(asset => {
-        if (asset.type === 'image') {
-          this.load.image(asset.key, `assets/images/${asset.path}`);
-        } else if (asset.type === 'audio') {
-          this.load.audio(asset.key, `assets/audio/${asset.path}`);
-        }
-      });
-
       // Asset loading event listeners
       this.load.on('filecomplete', (key) => console.log(`Asset loaded: ${key}`));
       this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key} - Check path: assets/${file.type}/${file.src}`));
