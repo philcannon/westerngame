@@ -88,13 +88,14 @@ document.addEventListener('DOMContentLoaded', () => {
     constructor() {
       super('GameScene');
       this.score = 0;
+      this.paused = false;
+      this.isBossActive = false; // Track if a boss is active
     }
     create() {
       if (gameState.homeMusic && gameState.homeMusic.isPlaying) gameState.homeMusic.stop();
       if (!gameState.bgMusic) gameState.bgMusic = this.sound.add('bgMusic', { loop: true, volume: 0.3 });
       gameState.bgMusic.play();
 
-      this.paused = false;
       this.health = 3;
       this.worldWidth = 1600;
       this.worldHeight = 1200;
@@ -107,21 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
       this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
       this.cameras.main.startFollow(this.cowboy, true);
 
-      this.buildings = this.physics.add.staticGroup();
       this.enemies = this.physics.add.group();
       this.dynamites = this.physics.add.group();
-      this.coins = this.physics.add.group();
+      this.bossProjectiles = this.physics.add.group(); // Group for boss projectiles
 
-      for (let i = 0; i < 15; i++) {
-        const x = Phaser.Math.Between(0, this.worldWidth - 50);
-        const y = Phaser.Math.Between(0, this.worldHeight - 50);
-        const hotel = this.buildings.create(x, y, 'hotel').setOrigin(0.5, 1);
-        hotel.setImmovable(true);
-        hotel.health = Phaser.Math.Between(1, 3);
-      }
-
-      this.time.addEvent({ delay: Phaser.Math.Between(5000, 10000), callback: this.spawnHotel, callbackScope: this, loop: true });
-      this.time.addEvent({ delay: Phaser.Math.Between(10000, 15000), callback: this.spawnEnemy, callbackScope: this, loop: true });
+      // Spawn the first boss immediately
+      this.spawnEnemy();
 
       this.cursors = this.input.keyboard.createCursorKeys();
       this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -131,12 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       this.scoreText = this.add.text(10, 10, `Score: ${this.score}`, { fontSize: '20px', color: '#000' }).setScrollFactor(0);
       this.coinsText = this.add.text(10, 40, `Coins: ${gameState.coins}`, { fontSize: '20px', color: '#000' }).setScrollFactor(0);
-      this.healthText = this.add.text(10, 70, 'Health: ♥♥♥', { fontSize: '20px', color: '#000' }).setScrollFactor(0);
+      this.healthText = this.add.text(10, 70, `Health: ${'♥'.repeat(this.health)}`, { fontSize: '20px', color: '#000' }).setScrollFactor(0);
 
-      this.physics.add.overlap(this.cowboy, this.enemies, this.takeDamage, null, this);
       this.physics.add.overlap(this.dynamites, this.enemies, this.killEnemy, null, this);
-      this.physics.add.overlap(this.dynamites, this.buildings, this.explodeDynamite, null, this);
-      this.physics.add.overlap(this.cowboy, this.coins, this.collectCoin, null, this);
+      this.physics.add.overlap(this.cowboy, this.bossProjectiles, this.hitByProjectile, null, this); // Player hit by boss projectiles
     }
     update() {
       if (this.paused) return;
@@ -159,24 +149,26 @@ document.addEventListener('DOMContentLoaded', () => {
         this.throwCharge = 0;
         this.aimDirection = { x: 0, y: -1 };
       }
-    }
-    spawnHotel() {
-      const x = Phaser.Math.Between(0, this.worldWidth - 50);
-      const y = Phaser.Math.Between(0, this.worldHeight - 50);
-      const hotel = this.buildings.create(x, y, 'hotel').setOrigin(0.5, 1);
-      hotel.setImmovable(true);
-      hotel.health = Phaser.Math.Between(1, 3);
+
+      // Update health display
+      this.healthText.setText(`Health: ${'♥'.repeat(this.health)}`);
     }
     spawnEnemy() {
-      const x = Phaser.Math.Between(0, this.worldWidth - 50);
-      const y = 50;
-      const enemy = this.enemies.create(x, y, 'enemy').setScale(1);
-      enemy.setVelocityY(100);
-      this.time.addEvent({ delay: 2000, callback: () => this.shootProjectile(enemy), callbackScope: this, loop: true });
+      if (!this.isBossActive) {
+        const x = Phaser.Math.Between(0, this.worldWidth - 50);
+        const y = Phaser.Math.Between(50, this.worldHeight - 50); // Random y-position for variety
+        const enemy = this.enemies.create(x, y, 'enemy').setScale(1);
+        enemy.health = 5;
+        this.isBossActive = true;
+        // Boss shoots projectiles every 2 seconds
+        this.time.addEvent({ delay: 2000, callback: () => this.shootProjectile(enemy), callbackScope: this, loop: true });
+      }
     }
     shootProjectile(enemy) {
-      const projectile = this.physics.add.sprite(enemy.x, enemy.y, 'dynamite').setScale(0.3);
-      this.physics.moveToObject(projectile, this.cowboy, 200);
+      if (enemy && enemy.active) { // Ensure enemy exists before shooting
+        const projectile = this.bossProjectiles.create(enemy.x, enemy.y, 'dynamite').setScale(0.3);
+        this.physics.moveToObject(projectile, this.cowboy, 200);
+      }
     }
     throwDynamite() {
       const throwStrength = 200 + this.throwCharge * 200;
@@ -185,31 +177,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     killEnemy(dynamite, enemy) {
       dynamite.destroy();
-      enemy.destroy();
-      this.score += 10;
-      this.scoreText.setText(`Score: ${this.score}`);
-    }
-    explodeDynamite(dynamite, building) {
-      dynamite.destroy();
-      building.health--;
-      if (building.health <= 0) {
-        const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(1);
-        this.sound.play('explosion', { volume: 0.8 });
-        this.time.delayedCall(300, () => explosion.destroy());
-        building.destroy();
-        this.score += 5;
+      enemy.health--;
+      if (enemy.health <= 0) {
+        enemy.destroy();
+        this.score += 10;
         this.scoreText.setText(`Score: ${this.score}`);
-        const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
-        coin.setVelocityY(-100);
+        this.isBossActive = false;
+        this.spawnEnemy(); // Immediately spawn a new boss
       }
     }
-    collectCoin(cowboy, coin) {
-      coin.destroy();
-      gameState.coins++;
-      this.coinsText.setText(`Coins: ${gameState.coins}`);
-    }
-    takeDamage(cowboy, enemy) {
-      enemy.destroy();
+    hitByProjectile(cowboy, projectile) {
+      projectile.destroy();
       this.health--;
       if (this.health <= 0) this.gameOver();
     }
@@ -219,7 +197,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const backButton = this.add.text(400, 350, 'Back to Home', { fontSize: '32px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setInteractive();
       backButton.on('pointerdown', () => { gameState.bgMusic.stop(); this.scene.start('HomeScene'); });
     }
-    togglePause() { this.paused = !this.paused; }
+    togglePause() {
+      if (!this.paused) {
+        this.physics.pause();
+        this.paused = true;
+        if (gameState.bgMusic && gameState.bgMusic.isPlaying) gameState.bgMusic.pause();
+        this.showPauseMenu();
+      } else {
+        this.physics.resume();
+        this.paused = false;
+        if (gameState.bgMusic) gameState.bgMusic.resume();
+        this.hidePauseMenu();
+      }
+    }
+    showPauseMenu() {
+      this.pauseOverlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5).setScrollFactor(0);
+      this.pauseText = this.add.text(400, 300, 'Paused', { fontSize: '48px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0);
+    }
+    hidePauseMenu() {
+      if (this.pauseOverlay) this.pauseOverlay.destroy();
+      if (this.pauseText) this.pauseText.destroy();
+    }
   }
 
   const config = {
