@@ -1,5 +1,30 @@
-// Define scene classes first to ensure they are available before use
+// Global game state to track music, upgrades, and player state
+const gameState = {
+  coins: parseInt(localStorage.getItem('coins')) || 0,
+  highScore: parseInt(localStorage.getItem('highScore')) || 0,
+  upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
+    bigDynamite: false,
+    speedBoots: false
+  },
+  homeMusic: null,
+  bgMusic: null
+};
 
+// Game configuration
+const config = {
+  type: Phaser.AUTO,
+  width: 800, // Visible window size, can scroll larger world
+  height: 600,
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 0 } }
+  },
+  scene: [HomeScene, ShopScene, GameScene]
+};
+
+const game = new Phaser.Game(config);
+
+// HomeScene: The main menu
 class HomeScene extends Phaser.Scene {
   constructor() {
     super('HomeScene');
@@ -9,8 +34,8 @@ class HomeScene extends Phaser.Scene {
     // Load all audio and image assets
     this.load.audio('homeMusic', 'westernhomescreen.m4a');
     this.load.audio('bgMusic', 'westernbackground.m4a');
-    this.load.audio('dynamiteShoot', 'dynamiteshoot.mp3'); // Placeholder for future sound
-    this.load.audio('explosion', 'explosion.mp3');         // Placeholder for future sound
+    this.load.audio('dynamiteShoot', 'dynamite.m4a'); // Placeholder for future sound
+    this.load.audio('explosion', 'explosion.m4a');         // Placeholder for future sound
     this.load.image('cowboy', 'westerncowboy.png');              // Cowboy sprite (player)
     this.load.image('hotel', 'westernhotel.png');                // Hotel sprite (static building)
     this.load.image('coin', 'westerncoin.png');           // Coin sprite
@@ -20,7 +45,7 @@ class HomeScene extends Phaser.Scene {
   }
 
   create() {
-    // Stop background music if playing (e.g., returning from GameScene)
+    // Stop background music if playing
     if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
       gameState.bgMusic.stop();
     }
@@ -48,9 +73,28 @@ class HomeScene extends Phaser.Scene {
       padding: { x: 10, y: 5 }
     }).setOrigin(0.5).setInteractive();
 
+    const shopButton = this.add.text(400, 400, 'Shop', {
+      fontSize: '32px',
+      color: '#000',
+      backgroundColor: '#fff',
+      padding: { x: 10, y: 5 }
+    }).setOrigin(0.5).setInteractive();
+
+    // High score and coins display
+    this.add.text(400, 500, `High Score: ${gameState.highScore} | Coins: ${gameState.coins}`, {
+      fontSize: '24px',
+      color: '#000'
+    }).setOrigin(0.5);
+
+    // Button interactions
     startButton.on('pointerdown', () => {
       gameState.homeMusic.stop();
       this.scene.start('GameScene');
+    });
+
+    shopButton.on('pointerdown', () => {
+      gameState.homeMusic.stop();
+      this.scene.start('ShopScene');
     });
 
     // Debug: Log to ensure scene loads
@@ -58,6 +102,85 @@ class HomeScene extends Phaser.Scene {
   }
 }
 
+// ShopScene: The shop interface
+class ShopScene extends Phaser.Scene {
+  constructor() {
+    super('ShopScene');
+  }
+
+  create() {
+    // Background (solid color as placeholder)
+    this.add.rectangle(400, 300, 800, 600, 0x87CEEB);
+
+    // Title
+    this.add.text(400, 100, 'Shop', {
+      fontSize: '48px',
+      color: '#000'
+    }).setOrigin(0.5);
+
+    const items = [
+      { name: 'Big Dynamite', cost: 50, key: 'bigDynamite' },
+      { name: 'Speed Boots', cost: 30, key: 'speedBoots' }
+    ];
+
+    items.forEach((item, index) => {
+      const y = 200 + index * 100;
+      this.add.text(300, y, `${item.name} - ${item.cost} Coins`, {
+        fontSize: '24px',
+        color: '#000'
+      }).setOrigin(0.5);
+
+      const buyButton = this.add.text(500, y, gameState.upgrades[item.key] ? 'Owned' : 'Buy', {
+        fontSize: '24px',
+        color: '#000',
+        backgroundColor: '#fff',
+        padding: { x: 10, y: 5 }
+      }).setOrigin(0.5).setInteractive();
+
+      if (!gameState.upgrades[item.key]) {
+        buyButton.on('pointerdown', () => {
+          if (gameState.coins >= item.cost) {
+            gameState.coins -= item.cost;
+            gameState.upgrades[item.key] = true;
+            buyButton.setText('Owned');
+            localStorage.setItem('coins', gameState.coins);
+            localStorage.setItem('upgrades', JSON.stringify(gameState.upgrades));
+          } else {
+            const notEnoughText = this.add.text(400, 500, 'Not enough coins!', {
+              fontSize: '20px',
+              color: '#f00'
+            }).setOrigin(0.5).setDepth(1);
+            this.time.delayedCall(2000, () => notEnoughText.destroy());
+          }
+        });
+
+        buyButton.on('pointerover', () => buyButton.setStyle({ color: '#ff0' }));
+        buyButton.on('pointerout', () => buyButton.setStyle({ color: '#000' }));
+      }
+    });
+
+    const backButton = this.add.text(400, 500, 'Back', {
+      fontSize: '32px',
+      color: '#000',
+      backgroundColor: '#fff',
+      padding: { x: 10, y: 5 }
+    }).setOrigin(0.5).setInteractive();
+
+    backButton.on('pointerdown', () => {
+      this.scene.start('HomeScene');
+      if (gameState.homeMusic) {
+        gameState.homeMusic.play();
+      }
+    });
+    backButton.on('pointerover', () => backButton.setStyle({ color: '#ff0' }));
+    backButton.on('pointerout', () => backButton.setStyle({ color: '#000' }));
+
+    // Debug: Log to ensure scene loads
+    console.log('ShopScene loaded successfully');
+  }
+}
+
+// GameScene: The main gameplay
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
@@ -80,13 +203,17 @@ class GameScene extends Phaser.Scene {
     this.bonusActive = false;
     this.paused = false;
     this.health = 3;
+    this.worldWidth = 1600; // Larger world for exploration
+    this.worldHeight = 1200;
 
-    // Background (solid color as placeholder)
-    this.add.rectangle(400, 300, 800, 600, 0xF4A261);
+    // Set world bounds
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
     // Player (cowboy sprite)
     this.cowboy = this.physics.add.sprite(400, 500, 'cowboy').setScale(1);
     this.cowboy.setCollideWorldBounds(true);
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.startFollow(this.cowboy, true);
 
     // Groups for game objects
     this.buildings = this.physics.add.staticGroup();
@@ -94,16 +221,19 @@ class GameScene extends Phaser.Scene {
     this.dynamites = this.physics.add.group();
     this.coins = this.physics.add.group();
 
-    // Spawn static hotels around the map
-    for (let i = 0; i < 5; i++) {
-      const x = Phaser.Math.Between(50, 750);
-      const hotel = this.buildings.create(x, 500, 'hotel').setOrigin(0.5, 1);
-      hotel.setImmovable(true);
-    }
+    // Initial static hotels
+    this.spawnHotel();
 
-    // Enemy spawn timer (boss enemies, every 20 seconds)
+    // Enemy and hotel spawn timers (random encounters)
     this.time.addEvent({
-      delay: 20000,
+      delay: Phaser.Math.Between(10000, 20000), // Random 10-20 seconds for hotels
+      callback: this.spawnHotel,
+      callbackScope: this,
+      loop: true
+    });
+
+    this.time.addEvent({
+      delay: Phaser.Math.Between(20000, 30000), // Random 20-30 seconds for bosses
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true
@@ -113,6 +243,7 @@ class GameScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.throwCharge = 0;
+    this.aimDirection = { x: 0, y: -1 }; // Default aim upward
     this.input.keyboard.on('keydown-ESC', this.togglePause, this);
 
     // HUD
@@ -137,7 +268,7 @@ class GameScene extends Phaser.Scene {
     try {
       if (this.paused) return;
 
-      // Player movement
+      // Player movement (explore the world)
       const baseSpeed = gameState.upgrades.speedBoots ? 200 : 160;
       const speed = this.bonusActive ? baseSpeed * 1.5 : baseSpeed;
       this.cowboy.setVelocity(0);
@@ -146,22 +277,42 @@ class GameScene extends Phaser.Scene {
       if (this.cursors.up.isDown) this.cowboy.setVelocityY(-speed);
       if (this.cursors.down.isDown) this.cowboy.setVelocityY(speed);
 
-      // Dynamite charging
+      // Dynamite aiming (while holding spacebar)
       if (this.spaceKey.isDown) {
         this.throwCharge = Math.min(this.throwCharge + 0.02, 1);
+        // Update aim direction based on arrow keys
+        if (this.cursors.left.isDown) this.aimDirection = { x: -1, y: 0 }; // Left
+        else if (this.cursors.right.isDown) this.aimDirection = { x: 1, y: 0 }; // Right
+        else if (this.cursors.up.isDown) this.aimDirection = { x: 0, y: -1 }; // Up
+        else if (this.cursors.down.isDown) this.aimDirection = { x: 0, y: 1 }; // Down
       } else if (Phaser.Input.Keyboard.JustUp(this.spaceKey)) {
         this.throwDynamite();
-        this.sound.play('dynamiteShoot'); // Placeholder sound for dynamite shooting
+        this.sound.play('dynamiteShoot'); // Sound for dynamite shooting
         this.throwCharge = 0;
+        this.aimDirection = { x: 0, y: -1 }; // Reset to default (up)
       }
     } catch (error) {
       console.error('Update error:', error);
     }
   }
 
+  spawnHotel() {
+    try {
+      const x = Phaser.Math.Between(0, this.worldWidth - 50);
+      const y = 500; // Ground level
+      const hotel = this.buildings.create(x, y, 'hotel').setOrigin(0.5, 1);
+      hotel.setImmovable(true);
+      hotel.health = Phaser.Math.Between(1, 3); // 1-3 hits to destroy
+    } catch (error) {
+      console.error('Hotel spawn error:', error);
+    }
+  }
+
   spawnEnemy() {
     try {
-      const enemy = this.enemies.create(400, 50, 'enemy').setScale(2); // Boss sprite
+      const x = Phaser.Math.Between(0, this.worldWidth - 50);
+      const y = 50; // Spawn from top
+      const enemy = this.enemies.create(x, y, 'enemy').setScale(2);
       enemy.setVelocityY(100); // Moves downward
     } catch (error) {
       console.error('Enemy spawn error:', error);
@@ -172,9 +323,9 @@ class GameScene extends Phaser.Scene {
     try {
       const baseStrength = this.bonusActive ? 300 : 200;
       const throwStrength = baseStrength + this.throwCharge * (this.bonusActive ? 300 : 200);
-      const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'dynamite');
-      dynamite.setVelocityY(-throwStrength);
-      dynamite.setScale(0.5); // Scale dynamite for visibility
+      const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'dynamite').setScale(0.5);
+      dynamite.setVelocity(this.aimDirection.x * throwStrength, this.aimDirection.y * throwStrength);
+      this.physics.world.wrap(dynamite, 0); // Optional: Wrap dynamite around world bounds
     } catch (error) {
       console.error('Dynamite throw error:', error);
     }
@@ -221,13 +372,17 @@ class GameScene extends Phaser.Scene {
   explodeDynamite(dynamite, building) {
     try {
       dynamite.destroy();
-      const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(1);
-      this.sound.play('explosion'); // Placeholder sound for explosion
-      this.time.delayedCall(300, () => explosion.destroy());
+      building.health--;
+      if (building.health <= 0) {
+        const explosion = this.add.sprite(building.x, building.y, 'explosion').setScale(1);
+        this.sound.play('explosion'); // Sound for explosion
+        this.time.delayedCall(300, () => explosion.destroy());
 
-      building.destroy();
-      const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
-      coin.setVelocityY(-100);
+        building.destroy();
+        const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
+        coin.setVelocityY(-100);
+        this.physics.world.wrap(coin, 0); // Optional: Wrap coin around world bounds
+      }
     } catch (error) {
       console.error('Explosion error:', error);
     }
@@ -236,7 +391,8 @@ class GameScene extends Phaser.Scene {
   collectCoin(cowboy, coin) {
     try {
       coin.destroy();
-      // Add coin collection logic here if needed
+      gameState.coins++;
+      this.coinsText.setText(`Coins: ${gameState.coins}`);
     } catch (error) {
       console.error('Coin collection error:', error);
     }
@@ -330,24 +486,9 @@ const gameState = {
   coins: parseInt(localStorage.getItem('coins')) || 0,
   highScore: parseInt(localStorage.getItem('highScore')) || 0,
   upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
+    bigDynamite: false,
     speedBoots: false
   },
   homeMusic: null,
   bgMusic: null
 };
-
-// Game configuration (now after scene definitions)
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  parent: 'game-container',
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { y: 0 } }
-  },
-  scene: [HomeScene, GameScene]
-};
-
-// Initialize the game (last, after all definitions)
-const game = new Phaser.Game(config);
