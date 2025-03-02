@@ -1,25 +1,5 @@
-// Global game state to track music and upgrades
-const gameState = {
-  homeMusic: null,
-  bgMusic: null,
-  upgrades: { speedBoots: false } // Example upgrade for demonstration
-};
+// Define scene classes first to ensure they are available before use
 
-// Game configuration
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { y: 0 } }
-  },
-  scene: [HomeScene, GameScene]
-};
-
-const game = new Phaser.Game(config);
-
-// HomeScene: The main menu
 class HomeScene extends Phaser.Scene {
   constructor() {
     super('HomeScene');
@@ -60,7 +40,6 @@ class HomeScene extends Phaser.Scene {
   }
 }
 
-// GameScene: The main gameplay
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
@@ -125,6 +104,9 @@ class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.cowboy, this.enemies, this.takeDamage, null, this);
     this.physics.add.overlap(this.dynamites, this.enemies, this.killEnemy, null, this);
     this.physics.add.overlap(this.dynamites, this.buildings, this.explodeDynamite, null, this);
+
+    // Error handling for assets
+    this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key}`));
   }
 
   update() {
@@ -153,102 +135,180 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnEnemy() {
-    const enemy = this.enemies.create(400, 50, 'cowboy').setScale(1); // Using cowboy sprite for simplicity
-    enemy.setVelocityY(100); // Moves downward
+    try {
+      const enemy = this.enemies.create(400, 50, 'cowboy').setScale(2); // Using cowboy sprite for boss, scaled larger
+      enemy.setVelocityY(100); // Moves downward
+    } catch (error) {
+      console.error('Enemy spawn error:', error);
+    }
   }
 
   throwDynamite() {
-    const baseStrength = this.bonusActive ? 300 : 200;
-    const throwStrength = baseStrength + this.throwCharge * (this.bonusActive ? 300 : 200);
-    const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'coin'); // Placeholder sprite
-    dynamite.setVelocityY(-throwStrength);
+    try {
+      const baseStrength = this.bonusActive ? 300 : 200;
+      const throwStrength = baseStrength + this.throwCharge * (this.bonusActive ? 300 : 200);
+      const dynamite = this.dynamites.create(this.cowboy.x, this.cowboy.y - 20, 'coin'); // Placeholder sprite
+      dynamite.setVelocityY(-throwStrength);
+    } catch (error) {
+      console.error('Dynamite throw error:', error);
+    }
   }
 
   killEnemy(dynamite, enemy) {
-    dynamite.destroy();
-    enemy.destroy();
-    this.killCounter++;
-    if (this.killCounter >= 10 && !this.bonusActive) {
-      this.activateBonus();
+    try {
+      dynamite.destroy();
+      enemy.destroy();
+      this.killCounter++;
+      if (this.killCounter >= 10 && !this.bonusActive) {
+        this.activateBonus();
+      }
+    } catch (error) {
+      console.error('Kill enemy error:', error);
     }
   }
 
   activateBonus() {
-    this.bonusActive = true;
-    const bonusText = this.add.text(400, 300, 'Gunslinger’s Surge Activated!', {
-      fontSize: '32px',
-      color: '#fff'
-    }).setOrigin(0.5);
-    this.time.delayedCall(3000, () => bonusText.destroy());
+    try {
+      this.bonusActive = true;
+      const bonusText = this.add.text(400, 300, 'Gunslinger’s Surge Activated!', {
+        fontSize: '32px',
+        color: '#fff'
+      }).setOrigin(0.5);
+      this.time.delayedCall(3000, () => bonusText.destroy());
+    } catch (error) {
+      console.error('Bonus activation error:', error);
+    }
   }
 
   takeDamage(cowboy, enemy) {
-    enemy.destroy();
-    this.health--;
-    if (this.health <= 0) {
-      this.gameOver();
+    try {
+      enemy.destroy();
+      this.health--;
+      if (this.health <= 0) {
+        this.gameOver();
+      }
+    } catch (error) {
+      console.error('Damage error:', error);
     }
   }
 
   explodeDynamite(dynamite, building) {
-    dynamite.destroy();
-    building.destroy();
-    const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
-    coin.setVelocityY(-100);
+    try {
+      dynamite.destroy();
+      building.destroy();
+      const coin = this.coins.create(building.x, building.y - 20, 'coin').setScale(0.5);
+      coin.setVelocityY(-100);
+    } catch (error) {
+      console.error('Explosion error:', error);
+    }
   }
 
   togglePause() {
-    if (!this.paused) {
-      this.physics.pause();
-      this.paused = true;
-      gameState.bgMusic.pause();
-      this.showPauseMenu();
-    } else {
-      this.physics.resume();
-      this.paused = false;
-      gameState.bgMusic.resume();
-      this.hidePauseMenu();
+    try {
+      if (!this.paused) {
+        this.physics.pause();
+        this.paused = true;
+        if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
+          gameState.bgMusic.pause();
+        }
+        this.showPauseMenu();
+      } else {
+        this.physics.resume();
+        this.paused = false;
+        if (gameState.bgMusic) {
+          gameState.bgMusic.resume();
+        }
+        this.hidePauseMenu();
+      }
+    } catch (error) {
+      console.error('Pause toggle error:', error);
     }
   }
 
   showPauseMenu() {
-    this.pauseBackground = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5);
-    this.resumeButton = this.add.text(400, 250, 'Resume', {
-      fontSize: '32px',
-      color: '#fff'
-    }).setOrigin(0.5).setInteractive();
-    this.quitButton = this.add.text(400, 350, 'Quit to Home', {
-      fontSize: '32px',
-      color: '#fff'
-    }).setOrigin(0.5).setInteractive();
+    try {
+      this.pauseBackground = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5);
+      this.resumeButton = this.add.text(400, 250, 'Resume', {
+        fontSize: '32px',
+        color: '#fff'
+      }).setOrigin(0.5).setInteractive();
+      this.quitButton = this.add.text(400, 350, 'Quit to Home', {
+        fontSize: '32px',
+        color: '#fff'
+      }).setOrigin(0.5).setInteractive();
 
-    this.resumeButton.on('pointerdown', () => this.togglePause());
-    this.quitButton.on('pointerdown', () => {
-      gameState.bgMusic.stop();
-      this.scene.start('HomeScene');
-    });
+      this.resumeButton.on('pointerdown', () => this.togglePause());
+      this.quitButton.on('pointerdown', () => {
+        if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
+          gameState.bgMusic.stop();
+        }
+        this.scene.start('HomeScene');
+      });
+    } catch (error) {
+      console.error('Pause menu error:', error);
+    }
   }
 
   hidePauseMenu() {
-    this.pauseBackground.destroy();
-    this.resumeButton.destroy();
-    this.quitButton.destroy();
+    try {
+      if (this.pauseBackground) this.pauseBackground.destroy();
+      if (this.resumeButton) this.resumeButton.destroy();
+      if (this.quitButton) this.quitButton.destroy();
+    } catch (error) {
+      console.error('Hide pause menu error:', error);
+    }
   }
 
   gameOver() {
-    gameState.bgMusic.pause();
-    const gameOverText = this.add.text(400, 250, 'Game Over', {
-      fontSize: '48px',
-      color: '#fff'
-    }).setOrigin(0.5);
-    const backButton = this.add.text(400, 350, 'Back to Home', {
-      fontSize: '32px',
-      color: '#fff'
-    }).setOrigin(0.5).setInteractive();
+    try {
+      if (gameState.bgMusic && gameState.bgMusic.isPlaying) {
+        gameState.bgMusic.pause();
+      }
 
-    backButton.on('pointerdown', () => {
-      gameState.bgMusic.stop();
-      this.scene.start('HomeScene');
-    });
+      const gameOverText = this.add.text(400, 250, 'Game Over', {
+        fontSize: '48px',
+        color: '#fff'
+      }).setOrigin(0.5);
+      const backButton = this.add.text(400, 350, 'Back to Home', {
+        fontSize: '32px',
+        color: '#fff'
+      }).setOrigin(0.5).setInteractive();
+
+      backButton.on('pointerdown', () => {
+        if (gameState.bgMusic) {
+          gameState.bgMusic.stop();
+        }
+        this.scene.start('HomeScene');
+      });
+    } catch (error) {
+      console.error('Game over error:', error);
+    }
   }
 }
+
+// Global game state (moved after scenes to avoid initialization issues)
+const gameState = {
+  coins: parseInt(localStorage.getItem('coins')) || 0,
+  highScore: parseInt(localStorage.getItem('highScore')) || 0,
+  upgrades: JSON.parse(localStorage.getItem('upgrades')) || {
+    speedBoots: false
+  },
+  homeMusic: null,
+  bgMusic: null
+};
+
+// Game configuration (now after scene definitions)
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  parent: 'game-container',
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 0 } }
+  },
+  scene: [HomeScene, GameScene]
+};
+
+// Initialize the game (last, after all definitions)
+const game = new Phaser.Game(config);
