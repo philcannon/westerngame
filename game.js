@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     preload() {
-      // Load all audio and image assets with error handling
+      // Load all audio and image assets from root level with error handling
       const assets = [
         { type: 'audio', key: 'homeMusic', path: 'westernhomescreen.m4a' },
         { type: 'audio', key: 'bgMusic', path: 'westernbackground.m4a' },
@@ -33,9 +33,17 @@ document.addEventListener('DOMContentLoaded', () => {
         { type: 'image', key: 'explosion', path: 'westernexplosion.png' }
       ];
 
-      // Asset loading event listeners
+      assets.forEach(asset => {
+        if (asset.type === 'image') {
+          this.load.image(asset.key, asset.path);
+        } else if (asset.type === 'audio') {
+          this.load.audio(asset.key, asset.path);
+        }
+      });
+
+      // Asset loading event listeners for debugging
       this.load.on('filecomplete', (key) => console.log(`Asset loaded: ${key}`));
-      this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key} - Check path: assets/${file.type}/${file.src}`));
+      this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key} - Check path: ${file.src}`));
     }
 
     create() {
@@ -252,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
       this.physics.add.overlap(this.cowboy, this.coins, this.collectCoin, null, this);
 
       // Error handling for assets
-      this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key} - Check path: assets/${file.type}/${file.src}`));
+      this.load.on('fileerror', (file) => console.error(`Failed to load asset: ${file.key} - Check path: ${file.src}`));
 
       // Debug: Log to ensure scene loads
       console.log('GameScene loaded successfully');
@@ -281,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
           else if (this.cursors.down.isDown) this.aimDirection = { x: 0, y: 1 }; // Down
         } else if (Phaser.Input.Keyboard.JustUp(this.spaceKey)) {
           this.throwDynamite();
-          this.sound.play('dynamiteShoot'); // Sound for dynamite shooting
+          this.sound.play('dynamite Shoot'); // Sound for dynamite shooting
           this.throwCharge = 0;
           this.aimDirection = { x: 0, y: -1 }; // Reset to default (up)
         }
